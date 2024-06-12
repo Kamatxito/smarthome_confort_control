@@ -1,0 +1,77 @@
+{
+	"info": {
+		"_postman_id": "06da6966-8586-4065-99b2-3900ecdab92b",
+		"name": "Smarthome",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Leer sensor",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{spaceLynk}}?m=json&r=grp&fn=getvalue&alias=3/1/1",
+					"host": [
+						"{{spaceLynk}}"
+					],
+					"query": [
+						{
+							"key": "m",
+							"value": "json"
+						},
+						{
+							"key": "r",
+							"value": "grp"
+						},
+						{
+							"key": "fn",
+							"value": "getvalue"
+						},
+						{
+							"key": "alias",
+							"value": "3/1/1"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Modificar actuador",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "{{spaceLynk}}?m=json&r=grp&fn=write&alias=2/3/6&value=Iniciar",
+					"host": [
+						"{{spaceLynk}}"
+					],
+					"query": [
+						{
+							"key": "m",
+							"value": "json"
+						},
+						{
+							"key": "r",
+							"value": "grp"
+						},
+						{
+							"key": "fn",
+							"value": "write"
+						},
+						{
+							"key": "alias",
+							"value": "2/3/6"
+						},
+						{
+							"key": "value",
+							"value": "Iniciar"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
