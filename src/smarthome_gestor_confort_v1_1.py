@@ -38,7 +38,7 @@ grafana_url = 'http://localhost:3003'
 dashboard_uid = 'WOfYtDjnz'
 dashboard_id = 1
 panel_id = 1
-api_key = ''
+api_key = '='
 anotacion = {
     "dashboardId": dashboard_id,
     "panelId": panel_id,
@@ -174,6 +174,7 @@ def valorar_control(tempInterior, tempExterior, CO2, humedadInterior, velocidadV
                 añadirAnotacionGrafana(2, "Prioridad Media", "Temperatura", mensaje)
         elif tempInterior > TEMP_MAX: # Hay que bajar la temperatura
             if tempExterior < tempInterior and estadoVentanas() == 100: # Se puede bajar de forma natural
+                print("Temperatura interior: " + str(tempInterior))
                 mensaje = "Temperatura interior alta. Abriendo ventanas para regularla."
                 lanzarAviso(mensaje)
                 abrirVentanas()
@@ -213,4 +214,4 @@ while (True):
     # Se realiza el control en función de los datos recogidos
     valorar_control(tempInterior, tempExterior, CO2, humedadInterior, velocidadViento, lluvia)
 
-    sleep(5 * 60)
+    sleep(1 * 60)

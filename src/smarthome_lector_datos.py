@@ -136,11 +136,16 @@ while (True):
     mongoColecActual = mongoDBActual["lluvia"]
 
     # Lluvia
+    if str(lluvia) == "True" :
+        lluviaTexto = "Sin lluvia"
+    else :
+        lluviaTexto = "Con lluvia"
     data = {
         "measurement": "lluvia",
         "time": now,
         "fields": {
-            'value': lluvia
+            'value': lluvia,
+            'texto': lluviaTexto
         }
     }
     json_payload.append(data)
