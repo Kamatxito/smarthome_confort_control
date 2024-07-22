@@ -1,58 +1,14 @@
-# ----- CONSTANTES, ESTRUCTURAS Y FUNCIONES -----
-
+from simulador_config import *
 import requests
-from time import sleep
+import json
 from datetime import datetime
 import pytz
-import json
 
-# Rangos específicos por variable
-CO2_MED = 1000  # ppm
-CO2_MAX = 2000  # ppm
-TEMP_MIN = 20  # °C
-TEMP_MAX = 25  # °C
-HUMEDAD_MIN = 30  # %
-HUMEDAD_MAX = 50  # %
-VEL_VIENTO_MAX = 10  # m/s
+# -----------------------------------------------------
+# -------- FUNCIONES GRAFANA --------------------------
+# -----------------------------------------------------
 
-# Variables y estructuras necesarias
-api_Dir = "http://remote:LabSmarthome21@192.168.7.210/scada-remote" # Direccion de la API
-parametros_GET = { # Parametros para la conexion a la API
-    'm': 'json', # Formato de salida
-    'r': 'grp', # Request
-    'fn': 'getvalue', # Función a ejecutar
-    'alias': '0/0/0' # Dirección del objeto
-}
-parametros_POST = { # Parametros para la conexion a la API
-    'm': 'json', # Formato de salida
-    'r': 'grp', # Request
-    'fn': 'write', # Función a ejecutar
-    'alias': '0/0/0', # Dirección del objeto
-    'value': '' # Nuevo valor del objeto
-}
-current_time = datetime.now(pytz.timezone('UTC'))
-current_timestamp = int(current_time.timestamp() * 1000)
-
-# Variables y estructuras para las anotaciones de Grafana
-grafana_url = 'http://localhost:3003'
-dashboard_uid = 'WOfYtDjnz'
-dashboard_id = 1
-panel_id = 1
-api_key = ''
-anotacion = {
-    "dashboardId": dashboard_id,
-    "panelId": panel_id,
-    "time": current_timestamp,
-    "isRegion": False, # Indica si es un momento exacto de tiempo o un rango
-    "tags": ["Prioridad X"],
-    "text": "Hola mundo."
-}
-cabecerasGrafana = {
-    'Content-Type': 'application/json',
-    'Authorization': f'Bearer {api_key}'
-}
-
-# Función que registra en Grafana la acción tomada mediante una anotación.
+# Añade una anotación al panel correspondiente en el momento actual
 def añadirAnotacionGrafana(panelId, prioridad, parametro, mensaje):
     # Nombre Panel  Id
     # Temperatura	2
@@ -63,6 +19,7 @@ def añadirAnotacionGrafana(panelId, prioridad, parametro, mensaje):
     anotacion['panelId'] = panelId
     anotacion['tags'] = [prioridad, parametro]
     anotacion['text'] = mensaje
+    anotacion['time'] = int(datetime.now(pytz.timezone('UTC')).timestamp() * 1000)
 
     response = requests.post(f'{grafana_url}/api/annotations', headers=cabecerasGrafana, data=json.dumps(anotacion))
 
@@ -71,7 +28,11 @@ def añadirAnotacionGrafana(panelId, prioridad, parametro, mensaje):
     else:
         print(f'Error al agregar anotación: {response.content}')
 
-# Función que realiza una petición a la API y obtiene los datos del sensor actual
+# -----------------------------------------------------
+# -------- FUNCIONES DE INTERACCIÓN CON LA API --------
+# -----------------------------------------------------
+
+# Recupera el valor de un sensor o actuador
 def GET_datos(alias):
     parametros_GET['alias'] = alias
     resultadoPeticion = requests.get(url=api_Dir, params=parametros_GET)
@@ -80,67 +41,108 @@ def GET_datos(alias):
         datos += 0.0
     return datos
 
-# Función que realiza una petición POST a la API y cambia el estado de los actuadores
-def POST_datos(parametros):
+# Modifica el valor de un actuador
+def POST_datos():
     r = requests.post(url=api_Dir, params=parametros_POST)
     print(r.status_code)
     print(r.json())
 
-# Función que se encarga de comprobar la altura de las ventanas
-def estadoVentanas():
-    valor = GET_datos('2/3/7')
-    print("Altura de la ventana: " + str(valor))
-    return valor
+# -----------------------------------------------------
+# -------- FUNCIONES DE BD ----------------------------
+# -----------------------------------------------------
 
-# Función que abre las ventanas de la Smarthome
-def abrirVentanas():
-    parametros_POST['alias'] = '2/3/5'
-    parametros_POST['value'] = 0
-    POST_datos(parametros_POST)
+# Inserta los datos en DB
+def insertarDatosDB(nombreColeccion, dato, json_payload, conexInfluxDB):
+    data = {
+        "measurement": nombreColeccion,
+        "time": datetime.now(pytz.timezone('UTC')),
+        "fields": {
+            'value': dato
+        }
+    }
+    json_payload.append(data)
+    conexInfluxDB.write_points(json_payload)
 
-# Función que cierra todas las ventanas de la Smarthome
-def cerrarVentanas():
-    parametros_POST['alias'] = '2/3/5'
-    parametros_POST['value'] = 1
-    POST_datos(parametros_POST)
+# -----------------------------------------------------
+# -------- FUNCIONES DE SONOS -------------------------
+# -----------------------------------------------------
 
-# Función que activa la calefacción
-def encenderCalefaccion():
-    #TO-DO
-    print("actuar")
-
-# Función que apaga la calefacción
-def apagarCalefaccion():
-    #TO-DO
-    print("actuar")
-
-# Función que apaga el aire acondicionado
-def apagarAireAcondicionado():
-    #TO-DO
-    print("actuar")
-
-# Función que enciende el aire acondicionado
-def encenderAireAcondicionado():
-    #TO-DO
-    print("actuar")
-
-# Función que genera y reproduce a través del altavoz la acción a realizar
+# Genera y reproduce el mensaje a través del altavoz
 def lanzarAviso(mensaje):
     print(mensaje)
 
+# -----------------------------------------------------
+# -------- FUNCIONES DE CONFORT -----------------------
+# -----------------------------------------------------
+
+# Recupera la altura de la ventana de referencia
+def estadoVentanas():
+    valor = GET_datos('2/3/7')
+    #accionEnCurso = GET_datos('2/3/5')
+    #print("Altura de la ventana: " + str(valor))
+    return valor
+
+# Función que abre la ventana de referencia
+def abrirVentanas():
+    parametros_POST['alias'] = '2/3/5'
+    parametros_POST['value'] = 0
+    POST_datos()
+
+# Función que cierra la ventana de referencia
+def cerrarVentanas():
+    parametros_POST['alias'] = '2/3/5'
+    parametros_POST['value'] = 1
+    POST_datos()
+
+# Función que enciende la calefacción
+def encenderCalefaccion():
+    global flag_calefaccion
+    flag_calefaccion = 1
+    if flag_calefaccion == 1:
+        print("Encendiendo calefacción")
+    else:
+        print("Calefacción apagada")
+
+# Función que apaga la calefacción
+def apagarCalefaccion():
+    global flag_calefaccion
+    flag_calefaccion = 0
+    if flag_calefaccion == 1:
+        print("Calefacción encendida")
+    else:
+        print("Apagando calefacción")
+
+# Función que apaga el aire acondicionado
+def apagarAireAcondicionado():
+    global flag_aire_acondicionado
+    flag_aire_acondicionado = 0
+    if flag_aire_acondicionado == 1:
+        print("Aire acondicionado encendido")
+    else:
+        print("Apagando aire acondicionado")
+
+# Función que enciende el aire acondicionado
+def encenderAireAcondicionado():
+    global flag_aire_acondicionado
+    flag_aire_acondicionado = 1
+    if flag_aire_acondicionado == 1:
+        print("Encendiendo aire acondicionado")
+    else:
+        print("Aire acondicionado apagado")
 
 # Función que realiza el control en función de los datos recogidos y los rangos establecidos
 def valorar_control(tempInterior, tempExterior, CO2, humedadInterior, velocidadViento, lluvia):
     prioridadActiva = 0
 
     # PRIORIDAD MÁXIMA
-    if CO2 > CO2_MAX:
+    if CO2 > CO2_MAX and estadoVentanas() == 100:
         mensaje = "Niveles de CO2 muy altos en el interior. Abriendo ventanas por seguridad."
         lanzarAviso(mensaje)
         abrirVentanas()
         apagarCalefaccion()
         prioridadActiva = 1
         añadirAnotacionGrafana(14, "Prioridad Máxima", "CO2", mensaje)
+        print("-----------")
 
     # PRIORIDAD ALTA
     if velocidadViento > VEL_VIENTO_MAX and prioridadActiva != 1 and estadoVentanas() != 100:
@@ -149,12 +151,14 @@ def valorar_control(tempInterior, tempExterior, CO2, humedadInterior, velocidadV
         cerrarVentanas()
         prioridadActiva = 2
         añadirAnotacionGrafana(10, "Prioridad Alta", "Vel. Viento", mensaje)
-    if lluvia == 1  and prioridadActiva != 1 and estadoVentanas() != 100:
+        print("-----------")
+    if int(lluvia) == 1  and prioridadActiva != 1 and estadoVentanas() != 100:
         mensaje = "Está lloviendo en el exterior. Cerrando ventanas por seguridad."
         lanzarAviso(mensaje)
         cerrarVentanas()
         prioridadActiva = 2
-        #añadirAnotacionGrafana(0, "Prioridad Alta", "Lluvia", mensaje)
+        añadirAnotacionGrafana(0, "Prioridad Alta", "Lluvia", mensaje)
+        print("-----------")
 
     # PRIORIDAD MEDIA
     if not TEMP_MIN <= tempInterior <= TEMP_MAX and prioridadActiva not in [1, 2]:
@@ -166,12 +170,14 @@ def valorar_control(tempInterior, tempExterior, CO2, humedadInterior, velocidadV
                 abrirVentanas()
                 apagarCalefaccion()
                 añadirAnotacionGrafana(2, "Prioridad Media", "Temperatura", mensaje)
-            else: # Hay que utilizar la calefacción
+                print("-----------")
+            elif flag_calefaccion == 0: # Hay que utilizar la calefacción
                 mensaje = "Temperatura interior baja. Encendiendo calefacción para regularla."
                 lanzarAviso(mensaje)
                 cerrarVentanas()
                 encenderCalefaccion()
                 añadirAnotacionGrafana(2, "Prioridad Media", "Temperatura", mensaje)
+                print("-----------")
         elif tempInterior > TEMP_MAX: # Hay que bajar la temperatura
             if tempExterior < tempInterior and estadoVentanas() == 100: # Se puede bajar de forma natural
                 print("Temperatura interior: " + str(tempInterior))
@@ -180,12 +186,14 @@ def valorar_control(tempInterior, tempExterior, CO2, humedadInterior, velocidadV
                 abrirVentanas()
                 apagarAireAcondicionado()
                 añadirAnotacionGrafana(2, "Prioridad Media", "Temperatura", mensaje)
-            else: # Hay que utilizar el aire acondicionado
+                print("-----------")
+            elif flag_aire_acondicionado == 0: # Hay que utilizar el aire acondicionado
                 mensaje = "Temperatura interior alta. Encendiendo aire acondicionado para regularla."
                 lanzarAviso(mensaje)
                 cerrarVentanas()
                 encenderAireAcondicionado()
                 añadirAnotacionGrafana(2, "Prioridad Media", "Temperatura", mensaje)
+                print("-----------")
     
     # PRIORIDAD BAJA
     if CO2 > CO2_MED and prioridadActiva not in [1, 2, 3] and estadoVentanas() == 100:
@@ -193,25 +201,28 @@ def valorar_control(tempInterior, tempExterior, CO2, humedadInterior, velocidadV
         lanzarAviso(mensaje)
         abrirVentanas()
         añadirAnotacionGrafana(14, "Prioridad Baja", "CO2", mensaje)
+        print("-----------")
     if not HUMEDAD_MIN <= humedadInterior <= HUMEDAD_MAX and prioridadActiva not in [1, 2, 3] and estadoVentanas() == 100:
         mensaje = "Humedad no óptima en el interior. Abriendo ventanas para regularla."
         lanzarAviso(mensaje)
         abrirVentanas()
         añadirAnotacionGrafana(4, "Prioridad Baja", "Humedad R.", mensaje)
+        print("-----------")
 
-# ----- PROGRAMA PRINCIPAL -----
+# -----------------------------------------------------
+# -------- FUNCIONES DE SOPORTE -----------------------
+# -----------------------------------------------------
 
-while (True):
-    # Datos que se recogen de la SmartHome
-    tempInterior = GET_datos('3/1/1')
-    tempExterior = GET_datos('3/2/5')
-    CO2 = GET_datos('3/2/1')
-    humedadInterior = GET_datos('3/2/2')
-    velocidadViento = GET_datos('3/2/4')
-    luxExterior = GET_datos('3/2/9') # TO-DO: Plantear qué control hacer sobre la luminosidad
-    lluvia = not GET_datos('3/2/10')
-
-    # Se realiza el control en función de los datos recogidos
-    valorar_control(tempInterior, tempExterior, CO2, humedadInterior, velocidadViento, lluvia)
-
-    sleep(1 * 60)
+# Imprime los valores por pantalla
+def imprimirValores(tempInterior, tempExterior, CO2, humedadInterior, velocidadViento, luxExterior, lluvia):
+    print("Temperatura interior: " + str(tempInterior))
+    print("Temperatura exterior: " + str(tempExterior))
+    print("CO2: " + str(CO2))
+    print("Humedad interior: " + str(humedadInterior))
+    print("Velocidad del viento: " + str(velocidadViento))
+    print("Luz exterior: " + str(luxExterior))
+    if lluvia == "0":
+        print("Lluvia: no está lloviendo")
+    else:
+        print("Lluvia: sí está lloviendo")
+    print("-----------")
